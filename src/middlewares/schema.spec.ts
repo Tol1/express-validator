@@ -155,6 +155,7 @@ describe('on each field', () => {
     expect(chainToContext(chain).optional).toEqual({
       checkFalsy: false,
       nullable: false,
+      defined: false,
     });
   });
 
