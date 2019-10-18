@@ -55,3 +55,22 @@ describe('#addItem()', () => {
     expect(context.stack).toEqual([item1, item2, item1, item2]);
   });
 });
+
+describe('#addPreItem()', () => {
+  it('builds a Context with all the item pushed to the preStack', () => {
+    const item1: ContextItem = {
+      run: () => Promise.resolve(),
+    };
+    const item2: ContextItem = {
+      run: () => Promise.resolve(),
+    };
+    builder
+      .addPreItem(item1)
+      .addPreItem(item2)
+      .addPreItem(item1, item2);
+
+    const context = builder.build();
+    expect(context.preStack).toHaveLength(4);
+    expect(context.preStack).toEqual([item1, item2, item1, item2]);
+  });
+});

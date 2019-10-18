@@ -156,6 +156,102 @@ describe('#getData()', () => {
     expect(context.getData({ requiredOnly: true })).toEqual([data[1], data[2]]);
   });
 
+  describe('when fetching optionals with default value', () => {
+    beforeEach(() => {
+      data.push({
+        location: 'body',
+        originalPath: 'bar',
+        path: 'bar',
+        originalValue: 'baz',
+        value: 'baz',
+      });
+    });
+
+    it('returns no data when context not optional', () => {
+      context.addFieldInstances(data);
+      expect(context.getData({ requiredOnly: false, onlyOptionalsWithDefaults: true })).toEqual([]);
+    });
+
+    it('returns no data when context has no default value', () => {
+      context.addFieldInstances(data);
+
+      context = new ContextBuilder()
+        .setOptional({ checkFalsy: false, nullable: false, defined: false })
+        .build();
+      expect(context.getData({ requiredOnly: false, onlyOptionalsWithDefaults: true })).toEqual([]);
+    });
+
+    it('filters out all but undefined fields', () => {
+      data[0].value = null;
+      data[1].value = undefined;
+
+      context = new ContextBuilder()
+        .setOptional({ checkFalsy: false, nullable: false, defined: false, defaultValue: () => 5 })
+        .build();
+      context.addFieldInstances(data);
+
+      expect(context.getData({ requiredOnly: false, onlyOptionalsWithDefaults: true })).toEqual([
+        data[1],
+      ]);
+    });
+
+    it('filters out all but undefined and null fields with nullable = true', () => {
+      data[0].value = null;
+      data[1].value = undefined;
+
+      context = new ContextBuilder()
+        .setOptional({ checkFalsy: false, nullable: true, defined: false, defaultValue: () => 5 })
+        .build();
+      context.addFieldInstances(data);
+
+      expect(context.getData({ requiredOnly: false, onlyOptionalsWithDefaults: true })).toEqual([
+        data[0],
+        data[1],
+      ]);
+    });
+
+    it('filters out all but null fields with nullable = true and defined = true', () => {
+      data[0].value = null;
+      data[1].value = undefined;
+
+      context = new ContextBuilder()
+        .setOptional({ checkFalsy: false, nullable: true, defined: true, defaultValue: () => 5 })
+        .build();
+      context.addFieldInstances(data);
+
+      expect(context.getData({ requiredOnly: false, onlyOptionalsWithDefaults: true })).toEqual([
+        data[0],
+      ]);
+    });
+
+    it('filters out all but falsy fields with checkFalsy = true', () => {
+      data[0].value = null;
+      data[1].value = undefined;
+      [0, false, ''].forEach((value, i) =>
+        data.push({
+          location: 'body',
+          originalPath: `bar${i}`,
+          path: `bar${i}`,
+          originalValue: value,
+          value,
+        }),
+      );
+
+      context = new ContextBuilder()
+        .setOptional({ checkFalsy: true, nullable: false, defined: false, defaultValue: () => 5 })
+        .build();
+      context.addFieldInstances(data);
+
+      expect(context.getData({ requiredOnly: false, onlyOptionalsWithDefaults: true })).toEqual([
+        data[0],
+        data[1],
+        data[3],
+        data[4],
+        data[5],
+      ]);
+    });
+  });
+
   describe('when same path occurs multiple times', () => {
     it('keeps only fields with value', () => {
       data = [

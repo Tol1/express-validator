@@ -3,6 +3,7 @@ import { Optional } from '../context';
 import { ChainCondition, CustomCondition } from '../context-items';
 import { CustomValidator } from '../base';
 import { Bail } from '../context-items/bail';
+import { Sanitization } from '../context-items/sanitization';
 import { ContextHandler } from './context-handler';
 import { ValidationChain } from './validation-chain';
 
@@ -35,7 +36,11 @@ export class ContextHandlerImpl<Chain> implements ContextHandler<Chain> {
         checkFalsy: !!options.checkFalsy,
         nullable: !!options.nullable,
         defined: !!options.defined,
+        defaultValue: options.defaultValue,
       });
+      if (options.defaultValue) {
+        this.builder.addPreItem(new Sanitization(options.defaultValue, true));
+      }
     }
 
     return this.chain;

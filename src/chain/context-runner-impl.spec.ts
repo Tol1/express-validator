@@ -40,12 +40,18 @@ it('selects and adds fields to the context', async () => {
 it('runs items on the stack with required data', async () => {
   builder.addItem({ run: jest.fn() }, { run: jest.fn() });
   getDataSpy.mockReturnValue(instances);
+  getDataSpy.mockReturnValueOnce([]);
 
   const req = { body: { foo: 'bar' } };
   const context = await contextRunner.run(req);
 
+  expect(getDataSpy).toHaveBeenNthCalledWith(1, {
+    requiredOnly: false,
+    onlyOptionalsWithDefaults: true,
+  });
+
   context.stack.forEach((item, i) => {
-    expect(getDataSpy).toHaveBeenNthCalledWith(i + 1, { requiredOnly: true });
+    expect(getDataSpy).toHaveBeenNthCalledWith(i + 2, { requiredOnly: true });
     expect(item.run).toHaveBeenCalledTimes(instances.length);
 
     instances.forEach((instance, j) => {
@@ -73,6 +79,7 @@ it('runs items on the stack in order', async () => {
 
   builder.addItem(item1, item2);
   getDataSpy.mockReturnValue(instances);
+  getDataSpy.mockReturnValueOnce([]);
   const resultPromise = contextRunner.run({});
 
   // Item 2 hasn't run yet -- the item 1's promise hasn't resolved
@@ -94,6 +101,71 @@ it('runs items on the stack in order', async () => {
   return resultPromise;
 });
 
+it('runs items on the preStack in order before items on the stack', async () => {
+  builder = new ContextBuilder().setFields(['foo', 'bar', 'baz']).setLocations(['query']);
+  let item1Resolve = () => {};
+  const item1Promise = new Promise(resolve => {
+    item1Resolve = resolve;
+  });
+  const item1: ContextItem = { run: jest.fn().mockReturnValueOnce(item1Promise) };
+
+  let item2Resolve = () => {};
+  const item2Promise = new Promise(resolve => {
+    item2Resolve = resolve;
+  });
+  const item2: ContextItem = { run: jest.fn().mockReturnValueOnce(item2Promise) };
+
+  let item3Resolve = () => {};
+  const item3Promise = new Promise(resolve => {
+    item3Resolve = resolve;
+  });
+  const item3: ContextItem = { run: jest.fn().mockReturnValueOnce(item3Promise) };
+
+  builder.addItem(item3);
+  builder.addPreItem(item1, item2);
+  const additionalInstances = [
+    { location: 'query', path: 'baz', originalPath: 'baz', value: 789, originalValue: 789 },
+  ];
+  getDataSpy.mockReturnValue(additionalInstances);
+  getDataSpy.mockReturnValueOnce(instances);
+
+  selectFields = jest.fn().mockReturnValue([...instances, ...additionalInstances]);
+  contextRunner = new ContextRunnerImpl(builder, selectFields);
+
+  const resultPromise = contextRunner.run({});
+
+  // Item 2 and 3 hasn't run yet -- the item 1's promise hasn't resolved
+  expect(item1.run).toHaveBeenCalledTimes(2);
+  expect(item2.run).not.toHaveBeenCalled();
+  expect(item3.run).not.toHaveBeenCalled();
+
+  item1Resolve();
+
+  // Make sure whatever promises are still pending are flushed by awaiting on one
+  // that will be completed on the next tick
+  await new Promise(resolve => setTimeout(resolve));
+
+  // Item 1 hasn't run any more times. Item 2 has got the green signal to run. Still waiting for item 3
+  expect(item1.run).toHaveBeenCalledTimes(2);
+  expect(item2.run).toHaveBeenCalledTimes(2);
+  expect(item3.run).not.toHaveBeenCalled();
+
+  // Item 2 is resolved, let's continue with stack
+  item2Resolve();
+
+  // Make sure whatever promises are still pending are flushed by awaiting on one
+  // that will be completed on the next tick
+  await new Promise(resolve => setTimeout(resolve));
+
+  expect(item1.run).toHaveBeenCalledTimes(2);
+  expect(item2.run).toHaveBeenCalledTimes(2);
+  expect(item3.run).toHaveBeenCalledTimes(1);
+
+  // Item 3 is resolved, then so should the context runner
+  item3Resolve();
+  return resultPromise;
+});
+
 it('stops running items on paths that got a validation halt', async () => {
   builder.addItem(
     {
@@ -104,6 +176,7 @@ it('stops running items on paths that got a validation halt', async () => {
     { run: jest.fn() },
   );
   getDataSpy.mockReturnValue(instances);
+  getDataSpy.mockReturnValueOnce([]);
 
   const req = { body: { foo: 'bar' } };
   const context = await contextRunner.run(req);
@@ -122,6 +195,7 @@ it('rethrows unexpected errors', async () => {
   });
   builder.addItem({ run: item1 });
   getDataSpy.mockReturnValue(instances);
+  getDataSpy.mockReturnValueOnce([]);
 
   await expect(contextRunner.run({ body: {} })).rejects.toThrowError();
   expect(item1).toHaveBeenCalled();

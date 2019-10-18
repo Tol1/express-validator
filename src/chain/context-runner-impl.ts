@@ -16,6 +16,20 @@ export class ContextRunnerImpl implements ContextRunner {
 
     const haltedInstances = new Set<string>();
 
+    const optionals = context.getData({ requiredOnly: false, onlyOptionalsWithDefaults: true });
+    if (optionals.length) {
+      for (const contextItem of context.preStack) {
+        const promises = optionals.map(async instance => {
+          await contextItem.run(context, instance.value, {
+            req,
+            location: instance.location,
+            path: instance.path,
+          });
+        });
+        await Promise.all(promises);
+      }
+    }
+
     for (const contextItem of context.stack) {
       const promises = context.getData({ requiredOnly: true }).map(async instance => {
         const instanceKey = `${instance.location}:${instance.path}`;

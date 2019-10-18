@@ -11,6 +11,7 @@ beforeEach(() => {
   builder = new ContextBuilder();
   jest.spyOn(builder, 'setOptional');
   jest.spyOn(builder, 'addItem');
+  jest.spyOn(builder, 'addPreItem');
 
   contextHandler = new ContextHandlerImpl(builder, {});
 });
@@ -90,5 +91,20 @@ describe('#optional()', () => {
 
     contextHandler.optional(false);
     expect(builder.setOptional).toHaveBeenNthCalledWith(5, false);
+
+    const defaultValue = () => 5;
+
+    contextHandler.optional({ defaultValue });
+    expect(builder.setOptional).toHaveBeenNthCalledWith(6, {
+      checkFalsy: false,
+      nullable: false,
+      defined: false,
+      defaultValue,
+    });
+    expect(builder.addPreItem).toHaveBeenCalledWith({
+      custom: true,
+      options: [],
+      sanitizer: defaultValue,
+    });
   });
 });

@@ -1,12 +1,19 @@
 import * as _ from 'lodash';
-import { FieldInstance, Location, Meta, ValidationError } from './base';
+import { CustomSanitizer, FieldInstance, Location, Meta, ValidationError } from './base';
 import { ContextItem } from './context-items';
 
 function getDataMapKey(path: string, location: Location) {
   return `${location}:${path}`;
 }
 
-export type Optional = { nullable: boolean; checkFalsy: boolean; defined?: boolean } | false;
+export type Optional =
+  | {
+      nullable: boolean;
+      checkFalsy: boolean;
+      defined?: boolean;
+      defaultValue?: CustomSanitizer;
+    }
+  | false;
 
 export class Context {
   private readonly _errors: ValidationError[] = [];
@@ -20,16 +27,22 @@ export class Context {
     readonly fields: string[],
     readonly locations: Location[],
     readonly stack: ReadonlyArray<ContextItem>,
+    readonly preStack: ReadonlyArray<ContextItem>,
     readonly optional: Optional,
     readonly message?: any,
   ) {}
 
-  getData(options: { requiredOnly: boolean } = { requiredOnly: false }) {
+  getData(
+    options: { requiredOnly: boolean; onlyOptionalsWithDefaults?: boolean } = {
+      requiredOnly: false,
+      onlyOptionalsWithDefaults: false,
+    },
+  ) {
     // Have to store this.optional in a const otherwise TS thinks the value could have changed
     // when the functions below run
     const { optional } = this;
-    const checks =
-      options.requiredOnly && optional
+    let checks =
+      (options.requiredOnly || options.onlyOptionalsWithDefaults) && optional
         ? [
             (value: any) =>
               optional.nullable
@@ -40,6 +53,13 @@ export class Context {
             (value: any) => (optional.checkFalsy ? value : true),
           ]
         : [];
+    if (options.onlyOptionalsWithDefaults && !options.requiredOnly) {
+      const oldCheks = [...checks];
+      checks = [
+        () => this.optional && !!this.optional.defaultValue,
+        (instanceValue: any) => oldCheks.some(check => !check(instanceValue)),
+      ];
+    }
 
     return _([...this.dataMap.values()])
       .groupBy('originalPath')
