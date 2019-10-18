@@ -31,6 +31,7 @@
     "docs:start": "npm --prefix ./website start",
     "docs:version": "npm --prefix ./website run version",
     "prepublishOnly": "tsc",
+    "prepare": "tsc",
     "test": "jest",
     "lint": "eslint 'src/**/*.ts'",
     "report-coverage": "cat coverage/lcov.info | coveralls",
